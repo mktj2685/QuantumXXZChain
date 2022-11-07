@@ -13,7 +13,7 @@ def parse_args():
     parser.add_argument('--J', type=float, default=1.0, help='Exchange coupling constant.')
     parser.add_argument('--Delta', type=float, default=1.0, help='XXZ anisotropic interaction parameter.')
     parser.add_argument('--k', type=int, default=6, help='Number of eigenvalues and eigenvectors desired.')
-    parser.add_argument('--sigma', type=float, default=10.0, help='Shift-invert parameter.')
+    parser.add_argument('--sigma', type=float, default=10.0, help='Shift-invert mode parameter.')
     return parser.parse_args()
 
 def get_states_Sz(S:Fraction, Sz:Fraction, N:int) -> List[Tuple[Fraction]]:

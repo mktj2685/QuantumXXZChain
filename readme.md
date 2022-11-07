@@ -43,6 +43,9 @@ pip install -r requirements.txt
 
 --k (optional, default is 6):
     Number of eigenvalues and eigenvectors desired.
+
+--sigma (optional, default is 10.0):
+    Shift-invert mode parameter. see https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.linalg.eigsh.html#scipy.sparse.linalg.eigsh
 ```
 
 ### Example
@@ -56,7 +59,10 @@ Result
 E0 = -2.4999999999999893
 ```
 
-This value consistent with the results of Bethe Ansatz ($E = -J\Delta\frac{N}{4}= -\frac{1}{4}$). 
+This value consistent with the results of Bethe Ansatz:
+$$
+E = -J\Delta\frac{N}{4}= -\frac{1}{4}
+$$. 
 
 
 
