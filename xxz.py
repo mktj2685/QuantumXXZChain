@@ -10,8 +10,10 @@ def parse_args():
     parser.add_argument('--S', type=str, help='Consider spin-S chain (e.g. 1/2, 1, 3/2, ...).')
     parser.add_argument('--N', type=int, help='Number of spins.')
     parser.add_argument('--Sz', type=str, default='0', help='Consider specific Sz subspace.')
+    parser.add_argument('--J', type=float, default=1.0, help='Exchange coupling constant.')
     parser.add_argument('--Delta', type=float, default=1.0, help='XXZ anisotropic interaction parameter.')
     parser.add_argument('--k', type=int, default=6, help='Number of eigenvalues and eigenvectors desired.')
+    parser.add_argument('--sigma', type=float, default=10.0, help='Shift-invert parameter.')
     return parser.parse_args()
 
 def get_states_Sz(S:Fraction, Sz:Fraction, N:int) -> List[Tuple[Fraction]]:
@@ -20,7 +22,7 @@ def get_states_Sz(S:Fraction, Sz:Fraction, N:int) -> List[Tuple[Fraction]]:
     states = [state for state in states if sum(state)==Sz]  # remain states which total Sz is Sz.
     return states
 
-def hamiltoniah(S:Fraction, Sz:Fraction, N:int, bonds:List[Tuple], J:List[float], Delta:float) -> np.ndarray:
+def hamiltoniah(S:Fraction, Sz:Fraction, N:int, bonds:List[Tuple], J:float, Delta:float) -> np.ndarray:
     maxSz = S                                           # max Sz (Fraction)
     minSz = -S                                          # min Sz (Fraction)
     states = get_states_Sz(S, Sz, N)                    # index (int) -> state (List[Tuple[Fraction]])
@@ -30,44 +32,43 @@ def hamiltoniah(S:Fraction, Sz:Fraction, N:int, bonds:List[Tuple], J:List[float]
 
     # Calculate Hamiltonian elements.
     for state in states:
-        for bond, Jij in zip(bonds, J):
+        for bond in bonds:
             i, j = bond
             idx = indices[state]
             Szi = float(state[i])                           # i-th site Sz value.
             Szj = float(state[j])                           # j-th site Sz value.
-            H[idx, idx] += Jij * Delta * Szi * Szj          # diagonal term SziSzj.
+            H[idx, idx] += -1.0 * J * Delta * Szi * Szj          # diagonal term SziSzj.
             if state[i] != maxSz and state[j] != minSz:     # off-diagonal term S+iS-j/2.
                 state_ = list(state)
                 state_[i] += 1
                 state_[j] -= 1
                 idx_ = indices[tuple(state_)]
-                H[idx, idx_] += 0.5 * Jij
+                H[idx, idx_] += -0.5 * J
             if state[i] != minSz and state[j] != maxSz:     # off-diagonal term S-iS+j/2.
                 state_ = list(state)
                 state_[i] -= 1
                 state_[j] += 1
                 idx_ = indices[tuple(state_)]
-                H[idx, idx_] += 0.5 * Jij
+                H[idx, idx_] += -0.5 * J
     return H
 
 if __name__ == '__main__':
     # Set experiment configures.
     args = parse_args()
-    N = args.N
     S = Fraction(args.S)
     Sz = Fraction(args.Sz)
-    Delta = args.Delta
     # bonds = [(i, i+1) for i in range(N-1)]                # OBC
-    bonds = [(i, i+1) for i in range(N-1)] + [(N-1, 0)]     # PBC
-    J = [1.0 for _ in range(len(bonds))]
+    bonds = [(i, i+1) for i in range(args.N-1)] + [(args.N-1, 0)]     # PBC
 
     # Get Hamiltonian matrix.
-    H = hamiltoniah(S, Sz, N, bonds, J, Delta)
+    H = hamiltoniah(S, Sz, args.N, bonds, args.J, args.Delta)
     dim = H.shape[0]
+    # print(H)
 
     # Diagonalize.
     k = args.k if args.k < dim else dim
-    w, v = eigsh(H, k=k, which='SM')
+    # NOTE see https://stackoverflow.com/questions/12125952/scipys-sparse-eigsh-for-small-eigenvalues
+    w, v = eigsh(H, k=k, which='LA', mode='normal', sigma=args.sigma)
     for i in range(k):
         print(f'E{i} = {w[i]}')
         print(f'|Ψ{i}> = {v[:,i]}')
