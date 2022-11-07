@@ -59,7 +59,7 @@ if __name__ == '__main__':
     Delta = args.Delta
     # bonds = [(i, i+1) for i in range(N-1)]                # OBC
     bonds = [(i, i+1) for i in range(N-1)] + [(N-1, 0)]     # PBC
-    J = [1.0 for i in range(len(bonds))]
+    J = [1.0 for _ in range(len(bonds))]
 
     # Get Hamiltonian matrix.
     H = hamiltoniah(S, Sz, N, bonds, J, Delta)
