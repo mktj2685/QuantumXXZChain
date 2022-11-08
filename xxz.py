@@ -19,37 +19,37 @@ def parse_args():
     return parser.parse_args()
 
 @profile
-def basis(S:Fraction, Sz:Fraction, N:int) -> List[Tuple[Fraction]]:
-    m = [S-i for i in range(int(2*S+1))]                    # Get possible Sz values.
-    states = product(m, repeat=N)                           # Get all possible states. Number of states is (2S+1)^n.
-    states = [state for state in states if sum(state)==Sz]  # remain states which total Sz is Sz.
-    return states
+def basis_Sz(S:Fraction, Sz:Fraction, N:int) -> List[Tuple[Fraction]]:
+    m = [S-i for i in range(int(2*S+1))]                    # Get possible single spin Sz values.
+    basis = product(m, repeat=N)                            # Get all possible states. Number of states is (2S+1)^n.
+    basis = [base for base in basis if sum(base)==Sz]       # remain states which total Sz equals to Sz.
+    return basis
 
 @profile
 def hamiltonian(S:Fraction, Sz:Fraction, N:int, bonds:List[Tuple], J:float, Delta:float) -> np.ndarray:
     maxSz = S                                           # max Sz (Fraction)
     minSz = -S                                          # min Sz (Fraction)
-    states = basis(S, Sz, N)                    # index (int) -> state (List[Tuple[Fraction]])
-    indices = dict(zip(states, range(len(states))))     # state (List[Tuple[Fraction]]) -> index (int)
-    dim = len(states)                                   # Hamiltonian dimension
+    basis = basis_Sz(S, Sz, N)                          # map to index (int) -> base (Tuple[Fraction])
+    indices = dict(zip(basis, range(len(basis))))       # map to base (Tuple[Fraction]) -> index (int)
+    dim = len(basis)                                    # Hamiltonian dimension
     H = np.zeros((dim, dim), dtype=np.float64)          # Hamiltonian matrix
 
     # Calculate Hamiltonian elements.
-    for state in states:
+    for base in basis:
         for bond in bonds:
             i, j = bond
-            idx = indices[state]
-            Szi = float(state[i])                           # i-th site Sz value.
-            Szj = float(state[j])                           # j-th site Sz value.
+            idx = indices[base]
+            Szi = float(base[i])                           # i-th site Sz value.
+            Szj = float(base[j])                           # j-th site Sz value.
             H[idx, idx] += -1.0 * J * Delta * Szi * Szj     # diagonal term SziSzj.
-            if state[i] != maxSz and state[j] != minSz:     # off-diagonal term S+iS-j/2.
-                state_ = list(state)
+            if base[i] != maxSz and base[j] != minSz:     # off-diagonal term S+iS-j/2.
+                state_ = list(base)
                 state_[i] += 1
                 state_[j] -= 1
                 idx_ = indices[tuple(state_)]
                 H[idx, idx_] += -0.5 * J
-            if state[i] != minSz and state[j] != maxSz:     # off-diagonal term S-iS+j/2.
-                state_ = list(state)
+            if base[i] != minSz and base[j] != maxSz:     # off-diagonal term S-iS+j/2.
+                state_ = list(base)
                 state_[i] -= 1
                 state_[j] += 1
                 idx_ = indices[tuple(state_)]
@@ -60,26 +60,26 @@ def hamiltonian(S:Fraction, Sz:Fraction, N:int, bonds:List[Tuple], J:float, Delt
 def hamiltonian_csr(S:Fraction, Sz:Fraction, N:int, bonds:List[Tuple], J:float, Delta:float, fmt:str='csr'):
     maxSz = S                                           # max Sz (Fraction)
     minSz = -S                                          # min Sz (Fraction)
-    states = basis(S, Sz, N)                            # index (int) -> state (List[Tuple[Fraction]])
-    indices = dict(zip(states, range(len(states))))     # state (List[Tuple[Fraction]]) -> index (int)
-    dim = len(states)                                   # Hamiltonian dimension
+    basis = basis_Sz(S, Sz, N)                          # map to index (int) -> base (Tuple[Fraction])
+    indices = dict(zip(basis, range(len(basis))))       # map to base (Tuple[Fraction]) -> index (int)
+    dim = len(basis)                                    # Hamiltonian dimension
     data = []                                           # non-zero elements
     row = []                                            # row of non-zero elements.
     col = []                                            # col of non-zero elements.
 
     # Calculate Hamiltonian elements.
-    for state in states:
+    for base in basis:
         for bond in bonds:
             i, j = bond
-            idx = indices[state]
-            Szi = float(state[i])                           # i-th site Sz value.
-            Szj = float(state[j])  
+            idx = indices[base]
+            Szi = float(base[i])                           # i-th site Sz value.
+            Szj = float(base[j])  
             diag = -1.0 * J * Delta * Szi * Szj
             data.append(diag)
             row.append(idx)
             col.append(idx)
-            if state[i] != maxSz and state[j] != minSz:     # off-diagonal term S+iS-j/2.
-                state_ = list(state)
+            if base[i] != maxSz and base[j] != minSz:     # off-diagonal term S+iS-j/2.
+                state_ = list(base)
                 state_[i] += 1
                 state_[j] -= 1
                 idx_ = indices[tuple(state_)]
@@ -87,8 +87,8 @@ def hamiltonian_csr(S:Fraction, Sz:Fraction, N:int, bonds:List[Tuple], J:float, 
                 data.append(offdiag)
                 row.append(idx)
                 col.append(idx_)
-            if state[i] != minSz and state[j] != maxSz:     # off-diagonal term S-iS+j/2.
-                state_ = list(state)
+            if base[i] != minSz and base[j] != maxSz:     # off-diagonal term S-iS+j/2.
+                state_ = list(base)
                 state_[i] -= 1
                 state_[j] += 1
                 idx_ = indices[tuple(state_)]
