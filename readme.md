@@ -11,7 +11,7 @@ $$
 \end{align}
 $$
 
-where $\braket{i,j}$ : coupling bond between $i$-th and $j$-th site.
+where $\braket{i,j}$ is coupling bond between $i$-th and $j$-th site.
 
 ## Install
 

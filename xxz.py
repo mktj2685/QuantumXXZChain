@@ -3,7 +3,9 @@ from typing import List, Tuple
 from fractions import Fraction
 from itertools import product
 import numpy as np
+from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import eigsh
+from memory_profiler import profile
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -16,16 +18,18 @@ def parse_args():
     parser.add_argument('--sigma', type=float, default=10.0, help='Shift-invert mode parameter.')
     return parser.parse_args()
 
-def get_states_Sz(S:Fraction, Sz:Fraction, N:int) -> List[Tuple[Fraction]]:
+@profile
+def basis(S:Fraction, Sz:Fraction, N:int) -> List[Tuple[Fraction]]:
     m = [S-i for i in range(int(2*S+1))]                    # Get possible Sz values.
     states = product(m, repeat=N)                           # Get all possible states. Number of states is (2S+1)^n.
     states = [state for state in states if sum(state)==Sz]  # remain states which total Sz is Sz.
     return states
 
-def hamiltoniah(S:Fraction, Sz:Fraction, N:int, bonds:List[Tuple], J:float, Delta:float) -> np.ndarray:
+@profile
+def hamiltonian(S:Fraction, Sz:Fraction, N:int, bonds:List[Tuple], J:float, Delta:float) -> np.ndarray:
     maxSz = S                                           # max Sz (Fraction)
     minSz = -S                                          # min Sz (Fraction)
-    states = get_states_Sz(S, Sz, N)                    # index (int) -> state (List[Tuple[Fraction]])
+    states = basis(S, Sz, N)                    # index (int) -> state (List[Tuple[Fraction]])
     indices = dict(zip(states, range(len(states))))     # state (List[Tuple[Fraction]]) -> index (int)
     dim = len(states)                                   # Hamiltonian dimension
     H = np.zeros((dim, dim), dtype=np.float64)          # Hamiltonian matrix
@@ -37,7 +41,7 @@ def hamiltoniah(S:Fraction, Sz:Fraction, N:int, bonds:List[Tuple], J:float, Delt
             idx = indices[state]
             Szi = float(state[i])                           # i-th site Sz value.
             Szj = float(state[j])                           # j-th site Sz value.
-            H[idx, idx] += -1.0 * J * Delta * Szi * Szj          # diagonal term SziSzj.
+            H[idx, idx] += -1.0 * J * Delta * Szi * Szj     # diagonal term SziSzj.
             if state[i] != maxSz and state[j] != minSz:     # off-diagonal term S+iS-j/2.
                 state_ = list(state)
                 state_[i] += 1
@@ -52,8 +56,50 @@ def hamiltoniah(S:Fraction, Sz:Fraction, N:int, bonds:List[Tuple], J:float, Delt
                 H[idx, idx_] += -0.5 * J
     return H
 
+@profile
+def hamiltonian_csr(S:Fraction, Sz:Fraction, N:int, bonds:List[Tuple], J:float, Delta:float, fmt:str='csr'):
+    maxSz = S                                           # max Sz (Fraction)
+    minSz = -S                                          # min Sz (Fraction)
+    states = basis(S, Sz, N)                            # index (int) -> state (List[Tuple[Fraction]])
+    indices = dict(zip(states, range(len(states))))     # state (List[Tuple[Fraction]]) -> index (int)
+    dim = len(states)                                   # Hamiltonian dimension
+    data = []                                           # non-zero elements
+    row = []                                            # row of non-zero elements.
+    col = []                                            # col of non-zero elements.
+
+    # Calculate Hamiltonian elements.
+    for state in states:
+        for bond in bonds:
+            i, j = bond
+            idx = indices[state]
+            Szi = float(state[i])                           # i-th site Sz value.
+            Szj = float(state[j])  
+            diag = -1.0 * J * Delta * Szi * Szj
+            data.append(diag)
+            row.append(idx)
+            col.append(idx)
+            if state[i] != maxSz and state[j] != minSz:     # off-diagonal term S+iS-j/2.
+                state_ = list(state)
+                state_[i] += 1
+                state_[j] -= 1
+                idx_ = indices[tuple(state_)]
+                offdiag = -0.5 * J
+                data.append(offdiag)
+                row.append(idx)
+                col.append(idx_)
+            if state[i] != minSz and state[j] != maxSz:     # off-diagonal term S-iS+j/2.
+                state_ = list(state)
+                state_[i] -= 1
+                state_[j] += 1
+                idx_ = indices[tuple(state_)]
+                offdiag = -0.5 * J
+                data.append(offdiag)
+                row.append(idx)
+                col.append(idx_)
+    return csr_matrix((data, (row, col)), (dim, dim))
+
 if __name__ == '__main__':
-    # Set experiment configures.
+    # Parse arguments.
     args = parse_args()
     S = Fraction(args.S)
     Sz = Fraction(args.Sz)
@@ -61,9 +107,9 @@ if __name__ == '__main__':
     bonds = [(i, i+1) for i in range(args.N-1)] + [(args.N-1, 0)]     # PBC
 
     # Get Hamiltonian matrix.
-    H = hamiltoniah(S, Sz, args.N, bonds, args.J, args.Delta)
+    # H = hamiltonian(S, Sz, args.N, bonds, args.J, args.Delta)
+    H = hamiltonian_csr(S, Sz, args.N, bonds, args.J, args.Delta)
     dim = H.shape[0]
-    # print(H)
 
     # Diagonalize.
     k = args.k if args.k < dim else dim
